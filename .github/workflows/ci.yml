@@ -96,7 +96,7 @@ jobs:
         working-directory: /home/runner/frappe-bench
         run: |
           bench get-app client_management $GITHUB_WORKSPACE
-          bench setup requirements --dev --skip-assets
+          bench setup requirements --dev
           pip install -r $GITHUB_WORKSPACE/requirements.txt
           bench new-site \
             --db-type postgres \
