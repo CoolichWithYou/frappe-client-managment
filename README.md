@@ -1,40 +1,53 @@
 ### Client Management
 
-work with clients
+## Содержание
 
-### Installation
+1. [Описание](#1-описание)
+2. [Переменные среды](#2-переменные-среды)
 
-You can install this app using the [bench](https://github.com/frappe/bench) CLI:
+## 1. Описание
 
-```bash
-cd $PATH_TO_YOUR_BENCH
-bench get-app $URL_OF_THIS_REPO --branch develop
-bench install-app client_management
-```
+Модуль frappe для валидации клиентской базы. Видео с демонстрацией:
 
-### Contributing
+<video width="480" height="360" controls>
+  <source src="demonstration/2025-08-08%2015-34-24.mkv" type="video/mp4">
+</video>
 
-This app uses `pre-commit` for code formatting and linting. Please [install pre-commit](https://pre-commit.com/#installation) and enable it for this repository:
+Для запуска:
 
-```bash
-cd apps/client_management
-pre-commit install
-```
+Создаём bench, добавляем в него текущий репозиторий
+и [репозиторий сайта](https://github.com/CoolichWithYou/frappe-sites)
 
-Pre-commit is configured to use the following tools for checking and formatting your code:
+Запускаем postgresql:
 
-- ruff
-- eslint
-- prettier
-- pyupgrade
-### CI
+`docker compose up --build -d`
 
-This app can use GitHub Actions for CI. The following workflows are configured:
+Подключаем сайт к нашему приложению
 
-- CI: Installs this app and runs unit tests on every push to `develop` branch.
-- Linters: Runs [Frappe Semgrep Rules](https://github.com/frappe/semgrep-rules) and [pip-audit](https://pypi.org/project/pip-audit/) on every pull request.
+`bench --site clients.localhost install-app client_management`
+
+Устанавливаем зависимости
+
+`bench pip install -r requirements.txt`
+
+Переходим на `clients.localhost:8000`, создаём таблицу Client с полями:
+
+|   Label | Type         | Name    |
+|--------:|:-------------|---------|
+|    name | autocomplete | name1   |
+|     inn | autocomplete | inn     |
+|     kpp | autocomplete | kpp     |
+| address | small_text   | address |
 
 
-### License
 
-mit
+## 2. Переменные среды
+
+Переменные среды для запуска базы данных
+
+| Секрет/перменная среды | Значение по умолчанию | Краткое описание     |
+|-----------------------:|:----------------------|----------------------|
+|            POSTGRES_DB | frappe                | название базы данных |
+|          POSTGRES_USER | frappe                | пользователь бд      |
+|      POSTGRES_PASSWORD | 13252                 | пароль бд            |
+
