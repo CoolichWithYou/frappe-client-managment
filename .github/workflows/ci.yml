@@ -35,7 +35,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd="pg_isready -U root"
+          --health-cmd="pg_isready -U frappe"
           --health-interval=5s
           --health-timeout=2s
           --health-retries=3
@@ -96,7 +96,8 @@ jobs:
         working-directory: /home/runner/frappe-bench
         run: |
           bench get-app client_management $GITHUB_WORKSPACE
-          bench setup requirements --dev
+          bench setup requirements --dev --skip-assets
+          pip install -r $GITHUB_WORKSPACE/requirements.txt
           bench new-site \
             --db-type postgres \
             --db-root-username frappe \
