@@ -13,9 +13,14 @@ concurrency:
 jobs:
   tests:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-    name: Server
+
+    env:
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      TOKEN: ${{ secrets.TOKEN }}
+      ROOT_USERNAME: ${{ secrets.ROOT_USERNAME }}
+      ROOT_PASSWORD: ${{ secrets.ROOT_PASSWORD }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
 
     services:
       redis-cache:
@@ -28,33 +33,28 @@ jobs:
           - 11000:6379
       postgres:
         image: postgres:14
-        env:
-          POSTGRES_PASSWORD: 13252
-          POSTGRES_USER: frappe
-          POSTGRES_DB: frappe
         ports:
           - 5432:5432
+        env:
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: frappe
         options: >-
-          --health-cmd="pg_isready -U frappe"
+          --health-cmd="pg_isready -U ${{ secrets.POSTGRES_USER }}"
           --health-interval=5s
           --health-timeout=2s
-          --health-retries=3
+          --health-retries=5
 
     steps:
-      - name: Clone
+      - name: Checkout code
         uses: actions/checkout@v3
-
-      - name: Find tests
-        run: |
-          echo "Finding tests"
-          grep -rn "def test" > /dev/null
 
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
@@ -71,48 +71,65 @@ jobs:
 
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: 'echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT'
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
 
-      - uses: actions/cache@v4
-        id: yarn-cache
+      - name: Cache yarn
+        uses: actions/cache@v4
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-yarn-
 
-      - name: Install PostgreSQL Client
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Initialize Frappe Bench
         run: |
-          sudo apt update
-          sudo apt-get install -y postgresql-client
+          bench init --skip-redis-config-generation --skip-assets --python "$(which python)" ./frappe-bench
+        working-directory: ${{ github.workspace }}
 
-      - name: Setup
-        run: |
-          pip install frappe-bench
-          bench init --skip-redis-config-generation --skip-assets --python "$(which python)" ~/frappe-bench
-
-
-      - name: Install
-        working-directory: /home/runner/frappe-bench
+      - name: Get app client_management
         run: |
           bench get-app client_management $GITHUB_WORKSPACE
-          bench setup requirements --dev
-          pip install -r $GITHUB_WORKSPACE/requirements.txt
-          bench new-site \
-            --db-type postgres \
-            --db-root-username frappe \
-            --db-root-password 13252 \
-            --admin-password 13252 \
-            test_site
-          bench --site test_site install-app client_management
-          bench build
-        env:
-          CI: 'Yes'
+        working-directory: ${{ github.workspace }}/frappe-bench
 
-      - name: Run Tests
-        working-directory: /home/runner/frappe-bench
+      - name: Install app requirements
+        run: |
+          pip install -r apps/client_management/requirements.txt
+        working-directory: ${{ github.workspace }}/frappe-bench
+
+      - name: Setup bench requirements for dev
+        run: bench setup requirements --dev
+        working-directory: ${{ github.workspace }}/frappe-bench
+
+      - name: Create new site
+        run: |
+          bench new-site test_site \
+            --db-type postgres \
+            --db-host postgres \
+            --db-root-username $POSTGRES_USER \
+            --db-root-password $POSTGRES_PASSWORD \
+            --admin-password $ADMIN_PASSWORD \
+            --no-mariadb-socket
+        working-directory: ${{ github.workspace }}/frappe-bench
+        env:
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+
+      - name: Install client_management app on site
+        run: bench --site test_site install-app client_management
+        working-directory: ${{ github.workspace }}/frappe-bench
+
+      - name: Build assets
+        run: bench build
+        working-directory: ${{ github.workspace }}/frappe-bench
+
+      - name: Run tests
         run: |
           bench --site test_site set-config allow_tests true
           bench --site test_site run-tests --app client_management
+        working-directory: ${{ github.workspace }}/frappe-bench
         env:
           TYPE: server
