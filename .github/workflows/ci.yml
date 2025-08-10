@@ -86,7 +86,7 @@ jobs:
 
       - name: Initialize Frappe Bench
         run: |
-          bench init --skip-assets --python "$(which python)" ./frappe-bench
+          bench init --skip-assets ./frappe-bench
         working-directory: ${{ github.workspace }}
 
       - name: Get app client_management
